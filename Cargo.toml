@@ -1,0 +1,7 @@
+[workspace]
+members = ["daemon", "pty","src"]
+resolver = "2"
+edition = "2021"
+
+[workspace.dependencies]
+pty = { path = "./pty/" }

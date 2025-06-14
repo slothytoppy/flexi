@@ -1,0 +1,10 @@
+[package]
+name = "flexi"
+
+[[bin]]
+name = "tab"
+path = "./main.rs"
+
+[dependencies]
+crossterm = "0.29.0"
+nix = { version = "0.30.1", features = ["term", "process", "fs", "poll"] }
