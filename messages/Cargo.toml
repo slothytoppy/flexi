@@ -1,0 +1,6 @@
+[package]
+name = "messages"
+version = "0.1.0"
+description = "the messaging module for the flexi terminal multiplexer"
+license = "MIT"
+edition = "2021"

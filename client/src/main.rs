@@ -1,39 +1,54 @@
 use std::{
-    io::{stdin, stdout, Read, Write},
-    net::TcpStream,
-    os::fd::AsFd,
+    io::{stdin, stdout, ErrorKind, Read, Write},
+    os::unix::net::UnixStream,
 };
 
-use nix::poll::{poll, PollFlags, PollTimeout};
+use crossterm::terminal::enable_raw_mode;
+use messages::ClientMessage;
 
 fn main() {
-    let mut stream = TcpStream::connect("127.0.0.1:8000").unwrap();
+    let mut stream = UnixStream::connect(messages::CONNECTION_PATH).unwrap();
     let mut buf = [0; 1024];
+
     let r = stream.read(&mut buf).unwrap();
     _ = stdout().write(&buf[0..r]);
-    print!("{}", str::from_utf8(&buf[0..r]).unwrap());
-    _ = std::io::stdout().flush();
+    _ = stdout().flush();
 
-    let stdin = stdin();
-    let mut fds = [nix::poll::PollFd::new(stdin.as_fd(), PollFlags::POLLIN)];
-    // _ = crossterm::terminal::enable_raw_mode();
+    // _ = enable_raw_mode();
 
     loop {
-        if poll(&mut fds, PollTimeout::MAX).unwrap() > 0 {
-            let n = std::io::stdin().read(&mut buf).unwrap();
-            let _ = stream.write(&buf[0..n]);
-            match stream.read(&mut buf) {
-                Ok(r) => {
-                    let s = unsafe { str::from_utf8_unchecked(&buf[0..r]) };
-                    print!("{s}");
-                    _ = std::io::stdout().flush();
+        match stdin().read(&mut buf) {
+            Ok(n) => {
+                if buf[0] as char == 'q' {
+                    _ = stream.write(&[ClientMessage::Disconnect as u8]);
+                    break;
                 }
-                Err(e) => {
-                    if e.kind() != std::io::ErrorKind::WouldBlock {
-                        panic!("{e:?}")
-                    }
+                let message = ClientMessage::try_from(buf[0]);
+                if let Err(e) = &message {
+                    println!("Error: {e:?}");
+                }
+                let message = message.unwrap();
+                buf[0] = message as u8;
+
+                let _ = stream.write(&buf[0..n]);
+            }
+            Err(e) => {
+                if e.kind() != ErrorKind::WouldBlock {
+                    panic!("{e:?}")
                 }
             }
-        }
+        };
+
+        match stream.read(&mut buf) {
+            Ok(r) => {
+                _ = stdout().write(&buf[0..r]).unwrap();
+                _ = stdout().flush();
+            }
+            Err(e) => {
+                if e.kind() != std::io::ErrorKind::WouldBlock {
+                    panic!("{e:?}");
+                }
+            }
+        };
     }
 }
